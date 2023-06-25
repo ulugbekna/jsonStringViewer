@@ -30,8 +30,10 @@ class JsonStringHoverProvider implements vscode.HoverProvider {
 
 		const unquotedStr = str.slice(1, -1);
 
+		const whitespaceFixedStr = unquotedStr.replace(/\\n/g, '\n').replace(/\\t/g, '	');
+
 		return new vscode.Hover(
-			new vscode.MarkdownString(unquotedStr.split('\\n').join('\n\n')),
+			new vscode.MarkdownString(whitespaceFixedStr),
 			strRange
 		);
 	}
