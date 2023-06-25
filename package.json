@@ -2,7 +2,7 @@
   "name": "json-string-viewer",
   "displayName": "json-string-viewer",
   "description": "View JSON strings",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "UlugbekAbdullaev",
   "repository": {
     "type": "git",
