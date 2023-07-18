@@ -33,7 +33,7 @@ class JsonStringHoverProvider implements vscode.HoverProvider {
 		const whitespaceFixedStr = unquotedStr.replace(/\\n/g, '\n').replace(/\\t/g, '	');
 
 		return new vscode.Hover(
-			new vscode.MarkdownString(whitespaceFixedStr),
+			new vscode.MarkdownString(`\`\`\`markdown\n${whitespaceFixedStr}\n\`\`\``),
 			strRange
 		);
 	}
