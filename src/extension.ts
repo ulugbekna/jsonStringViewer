@@ -1,78 +1,66 @@
-import * as Parser from "jsonc-parser";
 import * as vscode from "vscode";
+import { JsonLStringHoverProvider, JsonStringHoverProvider } from "./hoverProviders";
+import { JsonPath, Mapping, MappingKind, uuid } from "./typesAndUtis";
+import { JsonStringFS } from "./virtualFs";
+
+export const OPEN_CMD_ID = "jsonString.open";
 
 export function activate(context: vscode.ExtensionContext) {
+  const fsProvider = new JsonStringFS();
 
-	context.subscriptions.push(
-		vscode.languages.registerHoverProvider("json", new JsonStringHoverProvider())
-	);
+  context.subscriptions.push(
+    vscode.workspace.registerFileSystemProvider("jsonstr", fsProvider, { isCaseSensitive: true, isReadonly: false })
+  );
 
-	context.subscriptions.push(
-		vscode.languages.registerHoverProvider("jsonl", new JsonLStringHoverProvider())
-	);
-}
+  // Hover providers (JSON + JSONL)
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider("json", new JsonStringHoverProvider(OPEN_CMD_ID, "json"))
+  );
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider("jsonl", new JsonLStringHoverProvider(OPEN_CMD_ID))
+  );
 
-class JsonStringHoverProvider implements vscode.HoverProvider {
+  // Command to open the decoded editor
+  context.subscriptions.push(
+    vscode.commands.registerCommand(OPEN_CMD_ID, async (args: any) => {
+      try {
+        const { sourceUri, kind } = args as { sourceUri: string; kind: MappingKind };
+        const source = vscode.Uri.parse(sourceUri);
 
-	provideHover(document: vscode.TextDocument, position: vscode.Position): vscode.Hover | undefined {
+        let mapping: Mapping;
+        if (kind === "json") {
+          const path = (args.path ?? []) as JsonPath;
+          mapping = { id: uuid(), kind: "json", sourceUri: source, path };
+        } else {
+          const line = Number(args.line ?? 0);
+          const char = Number(args.char ?? 0);
+          mapping = { id: uuid(), kind: "jsonl", sourceUri: source, line, char };
+        }
 
-		const docContents = document.getText();
-		const parseTree = Parser.parseTree(docContents);
+        const virtualUri = fsProvider.registerMapping(mapping);
+        const doc = await vscode.workspace.openTextDocument(virtualUri);
+        await vscode.window.showTextDocument(doc, { preview: false });
+      } catch (e) {
+        vscode.window.showErrorMessage(`Open in Editor failed: ${e}`);
+      }
+    })
+  );
 
-		if (parseTree === undefined) { return; }
+  // Keep virtual views updated when source documents change
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((ev) => {
+      fsProvider.refreshBySourceUri(ev.document.uri);
+    })
+  );
 
-		const nodeAtCursor = Parser.findNodeAtOffset(parseTree, document.offsetAt(position));
-
-		if (nodeAtCursor === undefined || nodeAtCursor.type !== 'string') { return; }
-
-		const start = document.positionAt(nodeAtCursor.offset);
-		const end = document.positionAt(nodeAtCursor.offset + nodeAtCursor.length);
-		const strRange = new vscode.Range(start, end);
-		const str = document.getText(strRange);
-
-		if (!str.match(/\\r|\\n|\\r\\n/) && str.length < 20) { return; }
-
-		const unquotedStr = str.slice(1, -1);
-
-		const whitespaceFixedStr = unquotedStr.replace(/\\n/g, '\n').replace(/\\t/g, '	');
-
-		return new vscode.Hover(
-			new vscode.MarkdownString(`\`\`\`markdown\n${whitespaceFixedStr}\n\`\`\``),
-			strRange
-		);
-	}
-}
-
-class JsonLStringHoverProvider implements vscode.HoverProvider {
-
-	provideHover(document: vscode.TextDocument, position: vscode.Position): vscode.Hover | undefined {
-
-		const line = document.lineAt(position.line);
-		const docContents = line.text;
-		const parseTree = Parser.parseTree(docContents);
-
-		if (parseTree === undefined) { return; }
-
-		const nodeAtCursor = Parser.findNodeAtOffset(parseTree, position.character);
-
-		if (nodeAtCursor === undefined || nodeAtCursor.type !== 'string') { return; }
-
-		const start = document.positionAt(nodeAtCursor.offset);
-		const end = document.positionAt(nodeAtCursor.offset + nodeAtCursor.length);
-		const strRange = new vscode.Range(start, end);
-		const str = document.getText(strRange);
-
-		if (!str.match(/\\r|\\n|\\r\\n/) && str.length < 20) { return; }
-
-		const unquotedStr = str.slice(1, -1);
-
-		const whitespaceFixedStr = unquotedStr.replace(/\\n/g, '\n').replace(/\\t/g, '	');
-
-		return new vscode.Hover(
-			new vscode.MarkdownString(`\`\`\`markdown\n${whitespaceFixedStr}\n\`\`\``),
-			strRange
-		);
-	}
+  // Cleanup mappings when virtual docs are closed
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      if (doc.uri.scheme === "jsonstr") {
+        fsProvider.unregisterByUri(doc.uri);
+      }
+    })
+  );
 }
 
 export function deactivate() { }
