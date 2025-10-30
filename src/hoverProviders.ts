@@ -33,10 +33,9 @@ export class JsonStringHoverProvider implements vscode.HoverProvider {
 		};
 		const cmdUri = makeCommandLink(this.openCmdId, args);
 
-		const md = new vscode.MarkdownString(
-			`[Open in Editor](${cmdUri})\n\n\`\`\`markdown\n${decoded}\n\`\`\``,
-			true // support codicons if needed
-		);
+		const md = new vscode.MarkdownString(undefined, true);
+		md.appendMarkdown(`[Open in Editor](${cmdUri})\n\n`);
+		md.appendCodeblock(decoded, "json");
 		md.isTrusted = { enabledCommands: [this.openCmdId] };
 
 		return new vscode.Hover(md, range);
@@ -71,10 +70,9 @@ export class JsonLStringHoverProvider implements vscode.HoverProvider {
 		};
 		const cmdUri = makeCommandLink(OPEN_CMD_ID, args);
 
-		const md = new vscode.MarkdownString(
-			`[Open in Editor](${cmdUri})\n\n\`\`\`markdown\n${decoded}\n\`\`\``,
-			true
-		);
+		const md = new vscode.MarkdownString(undefined, true);
+		md.appendMarkdown(`[Open in Editor](${cmdUri})\n\n`);
+		md.appendCodeblock(decoded, "json");
 		md.isTrusted = { enabledCommands: [OPEN_CMD_ID] };
 
 		return new vscode.Hover(md, range);
